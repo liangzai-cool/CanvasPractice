@@ -1,0 +1,170 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Sprite Sheet Painter</title>
+		
+	</head>
+	<body>
+		<div id="control">
+			<input type="button" id="animateButton" value='Animate'>
+		</div>
+		<canvas id="canvas" width="800" height="600">
+			Canvas not support
+		</canvas>
+		<script type="text/javascript" src="requestAnimationFramePolyFill.js"></script>
+		<script type="text/javascript">
+			var Sprite = function(name, painter, behavior){
+				if (name !== undefined) this.name = name;
+				if (painter !== undefined)this.painter = painter;
+				this.top = 0;
+				this.width = 0;
+				this.height = 10;
+				this.velocityX = 0;
+				this.velocityY = 0;
+				this.visible = true;
+				this.animating = false;
+				this.behaviors = behavior || [];
+				return this;
+			}
+
+			Sprite.prototype = {
+				paint: function(context){
+					if (this.painter !== undefined && this.visible) {
+						this.painter.paint(this, context);
+					};
+				},
+				update: function(context, time){
+					for(var i=0; i< this.behaviors.length; ++i){
+						this.behaviors[i].execute(this, context, time);
+					}
+				}
+			}
+			var SpriteSheetPainter = function(cells, spritesheet){
+				this.cells = cells || [];
+				this.cellIndex = 0;
+				this.spritesheet = spritesheet
+			};
+
+			SpriteSheetPainter.prototype = {
+				advance: function(){
+					if (this.cellIndex == this.cells.length-1) {
+						this.cellIndex = 0;
+					}else{
+						this.cellIndex++;
+					}
+				},
+				paint: function(sprite, context){
+					var cell = this.cells[this.cellIndex];
+					console.log(cell)
+					context.drawImage(this.spritesheet, cell.left, cell.top, cell.width, cell.height,
+									sprite.left, sprite.top, cell.width, cell.height);
+					sprite.width = cell.width
+				}
+			}
+		</script>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				animateButton = document.getElementById('animateButton'),
+				spritesheet = new Image(),
+				runnerCells = [
+					{ left: 0,   top: 0,   width: 120, height:123},
+					{ left: 130, top: 0,   width: 120, height:123},
+					{ left: 260, top: 0,   width: 110, height:123},
+					{ left: 390, top: 0,   width: 110, height:123},
+					{ left: 520, top: 0,   width: 110, height:123},
+					{ left: 650, top: 0,   width: 110, height:123},
+					{ left: 0,   top: 123, width: 120, height:123},
+					{ left: 130, top: 123, width: 120, height:123},
+					{ left: 260, top: 123, width: 110, height:123},
+					{ left: 390, top: 123, width: 110, height:123},
+					{ left: 520, top: 123, width: 110, height:123},
+					{ left: 650, top: 123, width: 110, height:123}
+				],
+				runInPlace = {
+					lastAdvance: 0,
+					PAGEFLIP_INTERVAL: 200,
+					execute: function(sprite, context, now){
+						if (now - this.lastAdvance > this.PAGEFLIP_INTERVAL) {
+							sprite.painter.advance();
+							this.lastAdvance = now;
+						};
+					}
+				},
+				moveLeftToRight = {
+					lastMove: 0,
+					execute: function(sprite, context, time){
+						if (this.lastMove !== 0) {
+							sprite.left += sprite.velocityX * ((time - this.lastMove) / 1000);
+							if (sprite.left  > canvas.width) {
+								console.log(sprite.width)
+								sprite.left = -sprite.width;
+							};
+						};
+						this.lastMove = time;
+					}
+				},
+				sprite = new Sprite('runner', new SpriteSheetPainter(runnerCells, spritesheet), [runInPlace, moveLeftToRight]),
+				interval = null,
+				lastAdvance = 0,
+				paused = false,
+				PAGEFLIP_INTERVAL = 200;
+
+				function drawBackground(){
+					var STEP_Y = 12,
+						i = context.canvas.height;
+					while(i > STEP_Y * 4){
+						context.beginPath();
+						context.moveTo(0, i);
+						context.lineTo(context.canvas.width, i);
+						context.stroke();
+						i -= STEP_Y;
+					}
+				}
+
+				function pauseAnimation(){
+					animateButton.value = 'Animate';
+					paused = true;
+				}
+
+				function startAnimation(){
+					animateButton.value = 'Pause';
+					paused = false;
+					//console.log(lastAdvance)
+					//lastAdvance = +new Date;
+					//console.log(lastAdvance)
+					window.requestNextAnimationFrame(animate);
+				}
+
+				animateButton.onclick = function(e){
+					if (animateButton.value === 'Animate') startAnimation();
+					else pauseAnimation();
+				}
+
+				function animate(time){
+
+					if (!paused) {
+						context.clearRect(0,0,canvas.width, canvas.height);
+						drawBackground();
+						
+						sprite.update(context, time);
+						sprite.paint(context);
+						
+						window.requestNextAnimationFrame(animate);
+					};
+				}
+				spritesheet.src="images/runner.png";
+				sprite.velocityX = 100;
+				sprite.left = 300;
+				sprite.top = 150;
+				spritesheet.onload = function(e){
+					//context.drawImage(spritesheet, 0, 0);
+					sprite.paint(context);
+				}
+				
+				context.strokeStyle = 'lightgray';
+				context.lineWidth = 0.5;
+				drawBackground();
+		</script>
+	</body>
+</html>

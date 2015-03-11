@@ -1,0 +1,37 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RoundCornerRect</title>
+		<style type="text/css">
+			#canvas{
+				margin: 10px;	
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="700" height="500">
+			your browser can's support
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height/2),
+				Rgradient = context.createRadialGradient(canvas.width/2, canvas.height, 10, canvas.width/2, 0, 100);
+
+			gradient.addColorStop(0,    'blue');
+			gradient.addColorStop(0.25, 'white');
+			gradient.addColorStop(0.5,  'purple');
+			gradient.addColorStop(0.75, 'red');
+			gradient.addColorStop(1,    'yellow');
+
+			Rgradient.addColorStop(0,    'blue');
+			Rgradient.addColorStop(0.25, 'white');
+			Rgradient.addColorStop(0.5,  'purple');
+			Rgradient.addColorStop(0.75, 'red');
+			Rgradient.addColorStop(1,    'yellow');
+			
+			context.fillStyle = Rgradient;
+			context.fillRect(0, 0, canvas.width, canvas.height);
+		</script>
+	</body>
+</html>

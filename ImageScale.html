@@ -1,0 +1,151 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>ImageScale</title>
+		<style type="text/css">
+			body{
+				background:  rgba(100, 145, 250, 0.3);
+			}
+
+			#scaleSlider{
+				vertical-align: 10px;
+				width: 100px;
+				margin-left: 90px;
+			}
+
+			#canvas{
+				margin: 10px 20px 0px 20px;
+				border: thin solid #aaaaaa;
+				cursor: crosshair;
+			}
+
+			#controls{
+				margin-left: 15px;
+				padding: 0;
+			}
+
+			#scaleOutput{
+				margin-left: 15px;
+				width: 60px;
+				height: 30px;
+				margin-left: 10px;
+				vertical-align: center;
+				text-align: center;
+				color: blue;
+				font: 18px Arial;
+				text-shadow:2px 2px 4px rgba(100, 140,250, 0.8);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="controls">
+			<output id="scaleOutput">1.0</output>
+			<input id="scaleSlider" type='range' min='1' max='3' step='0.01' value='1.0'>
+		</div>
+
+		<canvas id="canvas" width="800" height="520">
+			canvas not supported
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+
+				offscreenCanvas = document.createElement('canvas'),
+				offscreenContext = offscreenCanvas.getContext('2d'),
+				image = new Image(),
+				scaleOutput = document.getElementById('scaleOutput'),
+				scaleSlider = document.getElementById('scaleSlider'),
+				scale = 1.0,
+				MINIMUM_SCALE = 1.0,
+				MAXIMUM_SCALE = 3.0;
+
+			function drawScaled(){
+				var w = canvas.width,
+					h = canvas.height,
+					sw = w * scale,
+					sh = h * scale;
+				//context.clearRect(0, 0, canvas.width, canvas.height);
+				//context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+				//drawWatermark();
+				context.drawImage(offscreenCanvas, 0, 0, offscreenCanvas.width, offscreenCanvas.height,
+									-sw/2 + w/2, -sh/2 + h/2, sw, sh);
+			}
+
+			function drawImage(){
+				var w = canvas.width,
+					h = canvas.height,
+					sw = w * scale,
+					sh = h * scale;
+
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				context.drawImage(image, -sw/2 + w/2, -sh/2 + h/2, sw, sh);
+			}
+
+			function drawScaleText(value){
+				var text = parseFloat(value).toFixed(2);
+				var percent = parseFloat(value - MINIMUM_SCALE) / parseFloat(MAXIMUM_SCALE - MINIMUM_SCALE);
+				scaleOutput.innerText = text;
+				percent = percent < 0.35? 0.35: percent;
+				scaleOutput.style.fontSize = percent * MAXIMUM_SCALE / 1.5 + 'em'
+			}
+
+			function drawWatermark(context){
+				var lineOne = 'Copyright',
+					lineTwo = 'Acme Inc.',
+					textMetrix,
+					FONT_HEIGHT = 128;
+
+				context.save();
+				context.font = FONT_HEIGHT + 'px Arial';
+				
+				context.globalAlpha = 0.6;
+				context.translate(canvas.width/2, canvas.height/2 - FONT_HEIGHT/2);
+				
+				textMetrix = context.measureText(lineOne);
+				context.fillText(lineOne, -textMetrix.width / 2, 0);
+				context.strokeText(lineOne, -textMetrix.width / 2, 0);
+
+				textMetrix = context.measureText(lineTwo);
+				context.fillText(lineTwo, -textMetrix.width / 2, FONT_HEIGHT);
+				context.strokeText(lineTwo, -textMetrix.width / 2, FONT_HEIGHT);
+
+				context.restore();
+			}
+
+			scaleSlider.onchange = function(e){
+				scale = e.target.value;
+				if (scale < MINIMUM_SCALE) scale = MINIMUM_SCALE;
+				else if (scale > MAXIMUM_SCALE) scale = MAXIMUM_SCALE;
+
+				drawScaled();
+				drawScaleText(scale);
+				
+			}
+
+			function initial(context){
+				context.fillStyle = 'cornflowerblue';
+				context.strokeStyle = 'yellow';
+				context.shadowColor = "rgba(50,50,50,1.0)";
+				context.shadowOffsetX = 5;
+				context.shadowOffsetY = 5;
+				context.shadowBlur = 10;
+			}
+
+			initial(context);
+			initial(offscreenContext);
+			
+
+			offscreenCanvas.width = canvas.width;
+			offscreenCanvas.height = canvas.height;
+			image.src = 'images/background-3.jpg';
+			image.onload = function(e){
+				context.drawImage(image, 0,0, canvas.width, canvas.height);
+				offscreenContext.drawImage(image, 0, 0, canvas.width, canvas.height);
+				drawWatermark(context);
+				drawWatermark(offscreenContext);
+				drawScaleText(scaleSlider.value);
+			}
+		</script>
+	</body>
+</html>

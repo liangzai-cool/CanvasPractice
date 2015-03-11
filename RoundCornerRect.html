@@ -1,0 +1,39 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RoundCornerRect</title>
+		<style type="text/css">
+			#canvas{
+				background-color: gray;
+				margin: 10px;	
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="700" height="500">
+			your browser can's support
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d');
+
+			
+
+			context.lineJoin = 'round';
+			context.lineWidth = 30;
+			context.font = '24px Helvetica';
+
+			context.fillText('click anywhere to erase', 175, 200);
+
+			context.strokeStyle = 'goldenrod';
+			context.fillStyle = 'cadetblue';
+
+			context.strokeRect(75,100,200,200);
+			context.fillRect(325,100,200,200);
+
+			context.canvas.onmousedown = function(e){
+				context.clearRect(0,0,canvas.width,canvas.height)
+			}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RubberBand</title>
+		<style type="text/css">
+			body{
+				background: rgba(100,145,250,0.3);
+				margin: 0;
+				padding: 0;
+			}
+			#canvas{
+				margin-left: 20px;
+				margin-right: 0;
+				margin-bottom: 20px;
+				border: thin solid #aaa;
+				cursor: crosshair;
+				padding: 0;
+			}
+			#control{
+				margin: 20px 0 20px 20px;
+			}
+			#rubber{
+				position: absolute;
+				border: 3px solid blue;
+				cursor: crosshair;
+				display: none;
+
+			}
+		</style>
+	</head>
+	<body>
+		<div id="control">
+			<input type="button" id="resetButton" value="reset">
+		</div>
+		<div id="rubber"></div>
+		<canvas id="canvas" width="1024" height="768">
+			your Browser are not supported
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById("canvas"),
+				context = canvas.getContext('2d'),
+				rubberDiv = document.getElementById("rubber"),
+				resetButton = document.getElementById("resetButton"),
+				image = new Image(),
+				mousedown = {},
+				rubberRect = {},
+				dragging = false;
+
+			//functions
+			function rubberbandStart(x, y){
+				mousedown.x = x;
+				mousedown.y = y;
+				rubberRect.left = mousedown.x;
+				rubberRect.top = mousedown.y;
+				
+				moveRubberDiv();
+				showRubberDiv();
+
+				dragging = true;
+			}
+
+			function rubberStretch(x, y){
+				rubberRect.left = x < mousedown.x ? x : mousedown.x;
+				rubberRect.top = y < mousedown.y ? y : mousedown.y;
+
+				rubberRect.width = Math.abs(x - mousedown.x);
+				rubberRect.height = Math.abs(y - mousedown.y);
+
+				console.log(rubberRect)
+				moveRubberDiv();
+				resizeRubberDiv();
+			}
+
+			function rubberEnd(){
+				var bbox = canvas.getBoundingClientRect();
+
+				try{
+					context.drawImage(canvas,
+									  rubberRect.left - bbox.left,
+									  rubberRect.top - bbox.top,
+									  rubberRect.width,
+									  rubberRect.height,
+									  0, 0, canvas.width, canvas.height)
+				}catch(e){
+
+				}
+				resetRubberRect();
+
+				rubberDiv.style.width = 0;
+				rubberDiv.style.height = 0;
+				hideRubberDiv();
+
+				dragging = false;
+			}
+
+			function moveRubberDiv(){
+				rubberDiv.style.left = rubberRect.left + 'px';
+				rubberDiv.style.top = rubberRect.top + 'px';
+			}
+
+			function resizeRubberDiv(){
+				rubberDiv.style.width = rubberRect.width + 'px';
+				rubberDiv.style.height = rubberRect.height + 'px';
+			}
+			function showRubberDiv(){
+				rubberDiv.style.display = "block";
+			}
+			function resetRubberRect(){
+				rubberRect = {top:0, left:0, width:0, height: 0};
+			}
+			function hideRubberDiv(){
+				rubberDiv.style.display = 'none';
+			}
+
+			canvas.onmousedown = function(e){
+				var x = e.clientX,
+					y = e.clientY;
+
+				e.preventDefault();
+				rubberbandStart(x, y);
+			}
+
+			window.onmousemove = function(e){
+				var x = e.clientX,
+					y = e.clientY;
+				e.preventDefault();
+				if (dragging) {
+					rubberStretch(x, y)
+				};
+			}
+			window.onmouseup = function(e){
+				e.preventDefault();
+				rubberEnd();
+			}
+
+			image.onload = function(){
+				context.drawImage(image, 0, 0, canvas.width, canvas.height)
+			}
+			resetButton.onclick = function(){
+				context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+				context.drawImage(image, 0, 0, canvas.width, canvas.height);
+			}
+
+			image.src = "images/background-3.jpg"
+		</script>
+	</body>
+</html>

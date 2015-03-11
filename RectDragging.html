@@ -1,0 +1,344 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>DraggingRect</title>
+		<style type="text/css">
+			body{
+				background-color: gray;
+			}
+			#canvas{
+				background-color: white;
+				margin: 10px;
+			}
+			#controls{
+				position: absolute;
+				left: 25px;
+				top: 25px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="control">
+			Edit
+			<input id="editCheckbox" type="checkbox">
+			Sides: 
+			<select id='sidesSelect'>
+				<option value='3' selected>3</option>
+				<option value='4'>4</option>
+				<option value='5'>5</option>
+			</select>
+			StartAngle: 
+			<select id='startAngleSelect'>
+				<option value='30' selected>30</option>
+				<option value='45'>45</option>
+				<option value='75'>75</option>
+				<option value='90'>90</option>
+			</select>
+			Stroke color:
+			<select id='strokeStyleSelect'>
+				<option value='red' selected>red</option>
+				<option value='green'>green</option>
+				<option value='blue'>blue</option>
+				<option value='orange'>orange</option>
+				<option value='cornflowerblue'>cornflowerblue</option>
+				<option value='goldenrod'>goldenrod</option>
+				<option value='navy'>navy</option>
+				<option value='purple'>purple</option>
+			</select>
+			Fill Color: 
+			<select id='fillStyleSelect'>
+				<option value='rgba(255,0,0,0.5)' selected>semi-red</option>
+				<option value='rgba(0,255,0,0.5)'>semi-green</option>
+				<option value='rgba(0,0,255,0.5)'>semi-blue</option>
+			</select>
+			<label>
+				Fill
+				<input id="fillCheckbox" type="checkbox" checked>
+			</label>
+			<input id="eraseAllButtion" type="button" value='Erase All'>
+		</div>
+		<canvas id="canvas" width="1000" height="700">
+			your browser can not support
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				editCheckbox = document.getElementById('editCheckbox'),
+				eraseAllButtion = document.getElementById('eraseAllButtion'),
+				strokeStyleSelect = document.getElementById('strokeStyleSelect'),
+				fillStyleSelect = document.getElementById('fillStyleSelect'),
+				fillCheckbox = document.getElementById('fillCheckbox'),
+				editCheckbox = document.getElementById('editCheckbox'),
+				sidesSelect = document.getElementById('sidesSelect'),
+				startAngleSelect = document.getElementById('startAngleSelect'),
+				drawingSurface,
+				mousedown = {},
+				rubberbanRect = {},
+				dragging = false,
+				draggingOffsetX,
+				draggingOffsetY,
+				side = 8,
+				startAngle = 0,
+				guidewires = false,
+				editing = false,
+				polygons = [];
+
+			var Point = function (x, y){
+				this.x = x;
+				this.y = y;
+			}
+
+			var Polygon = function(centerX , centerY, radius, sides, startAngle, strokeStyle, fillStyle, filled){
+				this.x = centerX;
+				this.y = centerY;
+				this.radius = radius;
+				this.sides = sides;
+				this.startAngle = startAngle;
+				this.strokeStyle = strokeStyle;
+				this.fillStyle = fillStyle;
+				this.filled = filled;
+			}
+
+			Polygon.prototype = {
+				getPoints:function(){
+					var points = [],
+						angle = this.startAngle || 0;
+					for(var i = 0;i<this.sides; ++i){
+						points.push(new Point(this.x + this.radius * Math.sin(angle),
+											  this.y + this.radius * Math.cos(angle)));
+						angle += 2*Math.PI/this.sides;
+					}
+					return points;
+				},
+				createPath:function(context){
+					var points = this.getPoints();
+					context.beginPath();
+					context.moveTo(points[0].x, points[0].y);
+					for(var i = 1; i< this.sides; ++i){
+						context.lineTo(points[i].x, points[i].y);
+					}
+					context.closePath();
+				},
+				stroke:function(context){
+					context.save();
+					this.createPath(context);
+					context.lineWidth = 3;
+					context.strokeStyle = this.strokeStyle;
+					context.stroke();
+					context.restore();
+				},
+				fill:function(context){
+					context.save();
+					this.createPath(context);
+					context.fillStyle = this.fillStyle;
+					context.fill();
+					context.restore();
+				},
+				move:function(x, y){
+					this.x = x;
+					this.y = y;
+				}
+			};
+
+			function drawGrid(color, stepx, stepy){
+				context.save()
+			   	context.shadowColor = undefined;
+			   	context.shadowOffsetX = 0;
+			   	context.shadowOffsetY = 0;
+			   	context.strokeStyle = color;
+			   	context.fillStyle = '#ffffff';
+			   	context.lineWidth = 0.5;
+			   	context.fillRect(0, 0, context.canvas.width,
+			                          context.canvas.height);
+			   	for (var i = stepx + 0.5; i < context.canvas.width; i += stepx) {
+			     	context.beginPath();
+			     	context.moveTo(i, 0);
+			     	context.lineTo(i, context.canvas.height);
+			    	context.stroke();
+				}
+				for (var i = stepy + 0.5;
+		            i < context.canvas.height; i += stepy) {
+		     		context.beginPath();
+		     		context.moveTo(0, i);
+		     		context.lineTo(context.canvas.width, i);
+		     		context.stroke();
+				}
+		   		context.restore();
+			}
+
+
+			function windowToCanvas(x, y){
+				var bbox = canvas.getBoundingClientRect();
+				return {x: x - bbox.left - (bbox.width - canvas.width)/2,
+						y: y - bbox.top - (bbox.height - canvas.height)/2}
+			}
+
+			function saveDrawingSurface(){
+				drawingSurface = context.getImageData(0, 0, canvas.width, canvas.height);
+			}
+
+			function restoreDrawingSurface(){
+				context.putImageData(drawingSurface, 0, 0);
+			}
+
+			function drawPolygon(polygon){
+				context.beginPath();
+				polygon.createPath(context);
+				polygon.stroke(context);
+				if(fillCheckbox.checked){
+					polygon.fill(context);
+				}
+			}
+
+			function updateRubberbandRectangle(loc){
+				rubberbanRect.width = Math.abs(loc.x - mousedown.x);
+				rubberbanRect.height = Math.abs(loc.y - mousedown.y);
+
+				rubberbanRect.left = (loc.x > mousedown.x) ?  mousedown.x:loc.x;
+				rubberbanRect.top = (loc.y > mousedown.y) ? mousedown.y: loc.y;
+			}
+
+			function drawRubberbandShape(loc){
+				var polygon = new Polygon(mousedown.x, mousedown.y, rubberbanRect.width,
+						parseInt(sidesSelect.value), 
+						(Math.PI / 180) * parseInt(startAngleSelect.value), 
+						context.strokeStyle, 
+						context.fillStyle,
+						fillCheckbox.checked);
+				drawPolygon(polygon);
+				if (!dragging) {
+					polygons.push(polygon);
+				};
+			}
+
+			function updateRubberband(loc){
+				updateRubberbandRectangle(loc);
+				drawRubberbandShape(loc);
+			}
+
+			function drawGuidewires(loc){
+				context.save();
+				context.strokeStyle = 'lightgray';
+				context.lineWidth = 0.5;
+				drawVerticalGuidewire(loc);
+				drawHorizontalGuidewire(loc);
+				context.restore();
+			}
+
+			function drawVerticalGuidewire(loc){
+				context.beginPath();
+				context.moveTo(loc.x, 0);
+				context.lineTo(loc.x, context.canvas.height);
+				context.stroke();
+			}
+
+			function drawHorizontalGuidewire(loc){
+				context.beginPath();
+				context.moveTo(0, loc.y);
+				context.lineTo(context.canvas.width, loc.y);
+				context.stroke();
+			}
+
+			function drawPolygons(){
+				polygons.forEach(function(polygon){
+					drawPolygon(polygon);
+				});
+			}
+
+			function startDragging(loc){
+				saveDrawingSurface();
+				mousedown.x = loc.x;
+				mousedown.y = loc.y;
+			}
+
+			function startEditing(){
+				canvas.style.cursor = 'pointer';
+				editing = true;
+			}
+
+			function stopEditing(){
+				canvas.style.cursor = 'crosshair';
+				editing = false;
+			}
+
+			canvas.onmousedown = function(e){
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				e.preventDefault();
+				if (editing) {
+					polygons.forEach(function(polygon){
+						polygon.createPath(context);
+						console.log(context.isPointInPath(loc.x, loc.y))
+						if (context.isPointInPath(loc.x, loc.y)) {
+							startDragging(loc);
+							dragging = polygon;
+							draggingOffsetX = loc.x - polygon.x;//计算的鼠标所点位置的偏移量
+							draggingOffsetY = loc.y - polygon.y;
+							return;						
+						};
+					})
+				}else{
+					startDragging(loc);
+					dragging = true;
+				}
+			}
+
+			canvas.onmousemove = function(e){
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				e.preventDefault();
+				if (editing && dragging) {
+					dragging.x = loc.x - draggingOffsetX;
+					//将偏移量考虑进去的新的中心点，dragging代表当前拖动的图形，传的是引用
+					dragging.y = loc.y - draggingOffsetY;
+					context.clearRect(0,0,canvas.width, canvas.height);
+					drawGrid('lightgray', 10, 10);
+					drawPolygons();
+
+				}else{
+					if (dragging) {
+						restoreDrawingSurface();
+						updateRubberband(loc);
+						if (guidewires) {
+							drawGuidewires(mousedown.x, mousedown.y);
+						};
+					};
+				}
+			}
+
+			canvas.onmouseup = function(e){
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				dragging = false;
+				if (!editing) {
+					restoreDrawingSurface();
+					updateRubberband(loc);
+				};
+			}
+			eraseAllButtion.onclick = function(e){
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				drawGrid('lightgray', 10, 10);
+				saveDrawingSurface();
+			}
+			strokeStyleSelect.onchange = function(e){
+				context.strokeStyle = strokeStyleSelect.value;
+			}
+			fillStyleSelect.onchange = function(e){
+				context.fillStyle = fillStyleSelect.value;
+			}
+			editCheckbox.onchange = function(e){
+				if(editCheckbox.checked){
+					startEditing();
+				}else{
+					stopEditing();
+				}
+			}
+
+			context.strokeStyle = strokeStyleSelect.value;
+			context.fillStyle = fillStyleSelect.value;
+			context.shadowColor = 'rgba(0,0,0,0.4)';
+			context.shadowOffsetX = 2;
+			context.shadowOffsetY = 2;
+			context.shadowBlur = 4;
+			drawGrid('lightgray', 10, 10);
+
+		</script>
+	</body>
+</html>

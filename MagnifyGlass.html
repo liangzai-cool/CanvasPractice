@@ -1,0 +1,139 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Magnifing Glass</title>
+		<style type="text/css">
+
+		</style>
+	</head>
+	<body>
+		<div id="controls">
+			<span id='magnifynum'>1.0</span>
+			<input id="scaleSlider" type='range' min='1' max='3' step='0.01' value='1.0'>
+			circle
+			<input id="adjustSlider" type='range' min='10' max='30' step='0.1' value='15'>
+		</div>
+		<canvas id="canvas" width='640' height='400'>
+			Canvas not suppoted
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				offscreenCanvas = document.createElement('canvas'),
+				offscreenContext = offscreenCanvas.getContext('2d'),
+				scaleSlider = document.getElementById('scaleSlider'),
+				adjustSlider = document.getElementById('adjustSlider'),
+				magnifynum = document.getElementById('magnifynum'),
+				imageData = null,
+				magnifyRectangle = {},
+				mousedown = {},
+				magnificationScale = 1.0,
+				magnifingGlassX,
+				magnifingGlassY,
+				magnifingGlassRadius,
+				dragging = false,
+				image = new Image();
+
+			function windowToCanvas(x, y){
+				var bbox = canvas.getBoundingClientRect();
+				return {x: x - bbox.left - (bbox.width - canvas.width)/2,
+						y: y - bbox.top - (bbox.height - canvas.height)/2};
+			}
+
+			function eraseMagnifyingGlass(){
+				if(imageData != null){
+					context.putImageData(imageData, magnifyRectangle.x, magnifyRectangle.y);
+				}
+			}
+
+			function drawMagnifyingGlass(loc){
+				var scaledMagnifyRectangle = null;
+				magnifingGlassX = loc.x;
+				magnifingGlassY = loc.y;
+
+				calculateMagnifyRectangle(loc);
+				console.log(magnifyRectangle)
+				imageData = context.getImageData(magnifyRectangle.x,
+												 magnifyRectangle.y,
+												 magnifyRectangle.width,
+												 magnifyRectangle.height);
+				context.save();
+				scaledMagnifyRectangle = {
+					width: magnifyRectangle.width * magnificationScale,
+					height: magnifyRectangle.height * magnificationScale
+				}
+
+				setClip();
+
+				offscreenContext.drawImage(canvas, magnifyRectangle.x, magnifyRectangle.y,
+								magnifyRectangle.width, magnifyRectangle.height,
+								0, 0,
+								scaledMagnifyRectangle.width,
+								scaledMagnifyRectangle.height);
+
+				context.drawImage(offscreenCanvas, 0, 0,
+								scaledMagnifyRectangle.width, scaledMagnifyRectangle.height,
+								magnifyRectangle.x + magnifyRectangle.width/2 - scaledMagnifyRectangle.width/2,
+								magnifyRectangle.y + magnifyRectangle.height/2 - scaledMagnifyRectangle.height/2,
+								scaledMagnifyRectangle.width,
+								scaledMagnifyRectangle.height);
+				context.restore();
+
+				drawMagnifyingGlassCircle()
+			}
+
+			function calculateMagnifyRectangle(loc){
+				magnifyRectangle.x = magnifingGlassX - magnifingGlassRadius;
+				magnifyRectangle.y = magnifingGlassY - magnifingGlassRadius;
+				magnifyRectangle.width = 2 * magnifingGlassRadius;
+				magnifyRectangle.height = 2 * magnifingGlassRadius;
+			}
+
+			function setClip(){
+				context.beginPath();
+				context.arc(magnifingGlassX, magnifingGlassY, magnifingGlassRadius, 0, Math.PI*2, false);
+				context.clip();
+			}
+
+			function drawMagnifyingGlassCircle(){
+				context.save();
+				context.beginPath();
+				context.strokeStyle = 'lightgray';
+				context.lineWidth = 3.0;
+				createMagnifyingGlassCirclePath(context);
+				context.stroke();
+				context.restore();
+			}
+
+			function createMagnifyingGlassCirclePath(context){
+				context.arc(magnifingGlassX, magnifingGlassY, magnifingGlassRadius, 0, Math.PI*2, false);
+			}
+			canvas.onmousedown = function(e){
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				e.preventDefault();
+				context.beginPath();
+				createMagnifyingGlassCirclePath(context);
+				if(context.isPointInPath(loc.x, loc.y)){
+					dragging = true;	
+				}
+			}
+
+			canvas.onmousemove = function(e){
+				if (dragging) {
+					eraseMagnifyingGlass();
+					drawMagnifyingGlass(windowToCanvas(e.clientX, e.clientY));
+				};
+			}
+
+			image.src = 'images/background-3.jpg';
+			image.onload = function(e){
+				context.drawImage(image, 0,0, canvas.width, canvas.height);
+				magnifingGlassRadius = adjustSlider.value;
+				drawMagnifyingGlass({x:canvas.width/2,
+									 y:canvas.height/2});
+				drawMagnifyingGlassCircle()
+			}
+
+		</script>
+	</body>
+</html>

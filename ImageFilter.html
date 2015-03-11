@@ -1,0 +1,108 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>ImageFilter</title>
+		<style type="text/css">
+			body {
+            	background: rgba(100, 145, 250, 0.3);
+			}
+			#canvas {
+	            margin: 10px 20px 0px 20px;
+	            border: thin solid #aaaaaa;
+	            cursor: crosshair;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="control">
+			Filter:
+			<select id="filterSelector">
+				<option value='undefined'>undefined</opion>
+				<option value='Negative'>negative</option>
+				<option value='BlackAndWhite'>black-and-white</option>
+				<option value='Emboss'>Emboss</option>
+			</select>
+		</div>
+		<canvas id="canvas" width='800' height='520'>
+			Canvas not supported
+		</canvas>
+		<script type="text/javascript">
+			var image = new Image(),
+				canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				filterSelector = document.getElementById('filterSelector');
+
+
+			var filters = function(){
+				
+			}
+
+			filters.prototype = {
+				Negative: function(context){
+					var imageData = context.getImageData(0,0,context.canvas.width, context.canvas.height),
+						data = imageData.data;
+
+					for(var i = 0; i <= data.length - 4; i+=4){
+						data[i] = 255 - data[i];
+						data[i+1] = 255 - data[i+1];
+						data[i+2] = 255 - data[i+2];
+	 				}
+	 				context.putImageData(imageData, 0, 0);
+				},
+				BlackAndWhite: function(context){
+					var imageData = context.getImageData(0,0,context.canvas.width, context.canvas.height),
+						data = imageData.data;
+
+
+					for(var i=0; i < data.length - 4; i+=4){
+						average = (data[i] + data[i+1] + data[i+2]) / 3;
+						data[i] = average;
+						data[i+1] = average;
+						data[i+2] = average;
+					}
+					context.putImageData(imageData, 0, 0)
+				},
+				Emboss: function(context){
+					var imagedata, data, length, width;
+					
+					imagedata = context.getImageData(0, 0, canvas.width, canvas.height);
+					data = imagedata.data;
+					width = imagedata.width;
+					length = data.length;
+					console.log(width);
+					console.log(length);
+
+					for(var i = 0; i < length; i++){
+						if ((i+1)% 4 !==0) {
+							data[i] = 255/2 			//Average value
+									+ 2*data[i]			//Current pixel
+									- data[i+4]			//Next pixel
+									- data[i+width*4]; 	//Pixel underneath
+						};
+					}
+					context.putImageData(imagedata, 0, 0);
+
+				},
+				redraw: function(image, context){
+					context.drawImage(image, 0, 0, image.width, image.height, 
+						0, 0, context.canvas.width, context.canvas.height);
+					context.getImageData(0,0,context.canvas.width, context.canvas.height)
+				}
+			}
+			
+			var fils = new filters();
+
+			filterSelector.onchange = function(e){
+				fils.redraw(image, context);
+				if(filterSelector.value != 'undefined') fils[filterSelector.value](context); 
+			}
+
+			image.src = "background-3.jpg";
+			image.onload = function(){
+				context.drawImage(image, 0, 0, image.width, image.height, 
+						0, 0, context.canvas.width, context.canvas.height);
+				context.getImageData(0,0,context.canvas.width, context.canvas.height)
+			}
+		</script>
+	</body>
+</html>

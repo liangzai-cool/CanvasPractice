@@ -1,0 +1,399 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Grid</title>
+		<style type="text/css">
+			body{
+				background-color: gray;
+			}
+
+			#canvas{
+				background-color: white;
+				margin: 10px;
+			}
+
+			#controls{
+				position: absolute;
+				left: 25px;
+				top: 25px;
+			}
+
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="1000" height="800">
+			your browser can not support
+		</canvas>
+		<div id="controls">
+			Stroke color:
+			<select id='strokeStyleSelect'>
+				<option value='red'>red</option>
+				<option value='green'>green</option>
+				<option value='blue'>blue</option>
+				<option value='orange'>orange</option>
+				<option value='cornflowerblue'>cornflowerblue</option>
+				<option value='goldenrod'>goldenrod</option>
+				<option value='navy'>navy</option>
+				<option value='purple'>purple</option>
+			</select>
+			Guidewires:
+			<input id="guidewireCheckbox" type="checkbox" checked>
+			<input id="eraseAllButtion" type="button" value='Erase All'>
+		</div>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				//Axis
+				AXIS_MARGIN = 40,
+				AXIS_ORIGIN = {x:AXIS_MARGIN, y:canvas.height - AXIS_MARGIN},
+				AXIS_TOP = AXIS_MARGIN,
+				AXIS_RIGHT = canvas.width - AXIS_MARGIN,
+				HORIZONTAL_TICK_SPACING = 10,
+				VERTICAL_TICK_SPACING = 10,
+				AXIS_WIDTH = AXIS_RIGHT - AXIS_ORIGIN.x,
+				AXIS_HEIGHT = AXIS_ORIGIN.y - AXIS_TOP,
+				NUM_VERTICAL_TICKS = AXIS_HEIGHT / VERTICAL_TICK_SPACING,
+				NUM_HORIZONTAL_TICKS = AXIS_WIDTH / HORIZONTAL_TICK_SPACING,
+				TICK_WIDTH = 10,
+				TICKS_LINEWIDTH = 0.5,
+				TICKS_COLOR = 'navy',
+				AXIS_LINEWIDTH = 0.5,
+				AXIS_COLOR = 'blue',
+				//Line Rubberband
+				eraseAllButton = document.getElementById('eraseAllButtion'),
+				strokeStyleSelect = document.getElementById('strokeStyleSelect'),
+				guidewireCheckbox = document.getElementById('guidewireCheckbox'),
+				drawingSerfaceImageData,
+				mousedown = {},
+				rubberbandRect = {},
+				dragging = false,
+				guidewires = guidewireCheckbox.checked,
+				//dashedline
+				moveToFunction = CanvasRenderingContext2D.prototype.moveTo;
+
+			//-------------Axes-------------
+			function drawAxes(){
+				context.save();
+				context.strokeStyle = AXIS_COLOR;
+				context.lineWidth = AXIS_LINEWIDTH;
+
+				drawHorizontalAxis();
+				drawVerticalAxis();
+
+				context.lineWidth = 0.5;
+				context.lineWidth = TICKS_LINEWIDTH;
+				context.strokeStyle = TICKS_COLOR;
+
+				drawVerticalAxisTicks();
+				drawHorizontalAxisTicks();
+				
+			
+				context.restore();
+			}
+
+			function drawHorizontalAxis(){
+				context.beginPath();
+				context.moveTo(AXIS_ORIGIN.x, AXIS_ORIGIN.y);
+				context.lineTo(AXIS_RIGHT, 	  AXIS_ORIGIN.y);
+				context.stroke();
+			}
+
+			function drawVerticalAxis(){
+				context.beginPath();
+				context.moveTo(AXIS_ORIGIN.x, AXIS_ORIGIN.y);
+				context.lineTo(AXIS_ORIGIN.x, AXIS_TOP);
+				context.stroke();
+			}
+
+			function drawVerticalAxisTicks(){
+				var deltaX;
+
+				for(var i = 1; i < NUM_VERTICAL_TICKS; ++i){
+					context.beginPath();
+					if (i % 5===0) deltaX = TICK_WIDTH;
+					else           deltaX = TICK_WIDTH / 2;
+
+					context.moveTo(AXIS_ORIGIN.x - deltaX,
+								   AXIS_ORIGIN.y - i * VERTICAL_TICK_SPACING);
+					context.lineTo(AXIS_ORIGIN.x + deltaX,
+								   AXIS_ORIGIN.y - i * VERTICAL_TICK_SPACING);
+					context.stroke()
+				}
+			}
+
+			function drawHorizontalAxisTicks(){
+				var deltaY;
+
+				for(var i = 1; i < NUM_HORIZONTAL_TICKS; ++i){
+					context.beginPath();
+					if (i % 5===0) deltaY = TICK_WIDTH;
+					else           deltaY = TICK_WIDTH / 2;
+
+					context.moveTo(AXIS_ORIGIN.x + i * HORIZONTAL_TICK_SPACING,
+								   AXIS_ORIGIN.y - deltaY);
+					context.lineTo(AXIS_ORIGIN.x + i * HORIZONTAL_TICK_SPACING,
+								   AXIS_ORIGIN.y + deltaY);
+					context.stroke()
+				}
+			}
+
+			//---------Grid----------
+			function drawGrid(context, color, stepx, stepy){
+				var width = context.canvas.width,
+					height = context.canvas.height,
+					i;
+
+				context.lineWidth = 0.5;
+				context.strokeStyle = color;
+
+				for(i = stepx + 0.5; i < width; i+=stepx){
+					context.beginPath();
+					context.moveTo(i, 0);
+					context.lineTo(i, height);
+					context.stroke()
+				}
+
+				for(i = stepy + 0.5; i < height; i+=stepy){
+					context.beginPath();
+					context.moveTo(0, i);
+					context.lineTo(width, i);
+					context.stroke()
+				}
+
+			}
+
+			
+			//----------TwoArcs-----------
+			function drawTowArcs(){
+				context.beginPath();
+				context.arc(200, 190, 150, 0, Math.PI*2, false);
+				context.arc(200, 190, 100, 0, Math.PI*2, true);
+				context.fill();
+				context.shadowColor = undefined;
+				context.shadowOffsetX = 0;
+				context.shadowOffsetY = 0;
+				context.stroke();
+ 			}
+ 			
+ 			//-------------Circle, Rectangle, Triangle----------
+ 			function rect (x, y, w, h, direction) {
+ 				if (direction) {
+ 					context.moveTo(x, y);
+ 					context.lineTo(x, y+h);
+ 					context.lineTo(x+w, y+h);
+ 					context.lineTo(x+w, y);
+ 				}else{
+ 					context.moveTo(x, y);
+ 					context.lineTo(x+w, y);
+ 					context.lineTo(x+w, y+h);
+ 					context.lineTo(x, y+h);
+ 				}
+ 				context.closePath();
+ 			}
+
+ 			function addOuterRectanglePath () {
+ 				context.rect(510, 25, 370, 335);
+ 			}
+
+ 			function addRectanglePath () {
+ 				rect(710, 55, 70, 35, true);
+ 			}
+
+ 			function addCirclePath () {
+ 				context.arc(700, 300, 40, 0, Math.PI*2 ,true);
+ 			}
+
+ 			function addTrianglePath(){
+ 				context.moveTo(800, 200);
+ 				context.lineTo(650, 115);
+ 				context.lineTo(600, 200);
+ 				context.closePath();
+ 			}
+
+ 			function drawCutouts(){
+ 				context.beginPath();
+ 				addOuterRectanglePath();
+ 				addCirclePath();
+ 				addRectanglePath();
+ 				addTrianglePath();
+ 				context.fill();
+ 			}
+
+ 			function strokeCutoutShapes(){
+ 				context.save();
+ 				context.strokeStyle = 'rgba(0,0,0,0.7)';
+ 				context.beginPath();
+ 				addOuterRectanglePath();
+ 				context.stroke();
+ 				context.beginPath();
+ 				addCirclePath();
+ 				addRectanglePath();
+ 				addTrianglePath();
+ 				context.stroke();
+ 				context.restore();
+ 			}
+ 			//-----------------Rubberband------------
+ 			function windowToCanvas(x, y){
+ 				var bbox = canvas.getBoundingClientRect();
+ 				return {x: x - bbox.left - (bbox.width - canvas.width)/2,
+						y: y - bbox.top - (bbox.height - canvas.height)/2}
+ 			}
+
+ 			function saveDrawingSurface(){
+ 				drawingSerfaceImageData = context.getImageData(0, 0, canvas.width, canvas.height);
+ 			}
+
+ 			function restoreDrawingSurface(){
+ 				context.putImageData(drawingSerfaceImageData, 0, 0);
+ 			}
+
+ 			function updateRubberbandRectangle(loc){
+ 				rubberbandRect.width = Math.abs(loc.x - mousedown.x);
+ 				rubberbandRect.height = Math.abs(loc.y - mousedown.y);
+
+ 				if (loc.x > mousedown.x) rubberbandRect.left = mousedown.x;
+ 				else					 rubberbandRect.left = loc.x;
+
+ 				if (loc.y > mousedown.y) rubberbandRect.top = mousedown.y;
+ 				else					 rubberbandRect.top = loc.y;
+ 			}
+
+ 			function drawRubberbandShape(loc){
+ 				context.beginPath();
+ 				context.moveTo(mousedown.x, mousedown.y);
+ 				context.lineTo(loc.x, loc.y);
+ 				context.stroke();
+ 			}
+
+ 			function updateRubberband(loc){
+ 				updateRubberbandRectangle(loc);
+ 				drawRubberbandShape(loc);
+ 			}
+
+ 			function drawHorizontalLine(y){
+ 				context.beginPath();
+ 				context.moveTo(0, y+0.5);
+ 				context.lineTo(context.canvas.width, y+0.5);
+ 				context.stroke();
+ 			}
+
+ 			function drawVerticalLine(x){
+ 				context.beginPath();
+ 				context.moveTo(x+0.5, 0);
+ 				context.lineTo(x+0.5, context.canvas.height);
+ 				context.stroke();
+ 			}
+
+ 			function drawGuidewires(x, y){
+ 				context.save();
+ 				context.strokeStyle = 'rgba(0, 0, 230,0.4)';
+ 				context.lineWidth = 0.5;
+ 				drawVerticalLine(x);
+ 				drawHorizontalLine(y);
+ 				context.restore();
+ 			}
+
+ 			canvas.onmousedown = function(e){
+ 				var loc = windowToCanvas(e.clientX, e.clientY);
+ 				e.preventDefault();
+ 				saveDrawingSurface();
+ 				mousedown.x = loc.x;
+ 				mousedown.y = loc.y;
+ 				dragging = true;
+ 			}
+
+ 			canvas.onmousemove = function(e){
+ 				var loc;
+
+ 				if (dragging) {
+ 					e.preventDefault();
+ 					loc = windowToCanvas(e.clientX, e.clientY);
+ 					restoreDrawingSurface();
+ 					updateRubberband(loc);
+ 					if (guidewires) {
+ 						drawGuidewires(loc.x, loc.y);
+ 					};
+ 				};
+ 			}
+
+ 			canvas.onmouseup = function(e){
+ 				var loc = windowToCanvas(e.clientX, e.clientY);
+ 				restoreDrawingSurface();
+ 				updateRubberband(loc);
+ 				dragging = false;
+ 			}
+
+ 			eraseAllButtion.onclick = function(e){
+ 				context.clearRect(0, 0, canvas.width, canvas.height);
+ 				drawGrid(context, 'lightgray', 10, 10);
+ 				context.strokeStyle = strokeStyleSelect.value;
+ 				saveDrawingSurface();
+ 			}
+
+ 			strokeStyleSelect.onchange = function(e){
+ 				context.strokeStyle = strokeStyleSelect.value;
+ 			}
+
+ 			guidewireCheckbox.onchange = function(e){
+ 				guidewires = guidewireCheckbox.checked;
+ 			}
+
+ 			//-----------dashed line-------------
+ 			CanvasRenderingContext2D.prototype.lastMoveToLocation = {};
+ 			CanvasRenderingContext2D.prototype.moveTo = function(x, y){
+ 				moveToFunction.apply(context, [x, y]);
+ 				this.lastMoveToLocation.x = x;
+ 				this.lastMoveToLocation.y = y;
+ 			}
+ 			CanvasRenderingContext2D.prototype.dashedLineTo = function(x, y, dashLength){
+ 				dashLength = dashLength === undefined ? 5 : dashLength;
+
+ 				var startX = this.lastMoveToLocation.x,
+ 					startY = this.lastMoveToLocation.y,
+ 					deltaX = x - startX,
+ 					deltaY = y - startY,
+ 					numDashed = Math.floor(Math.sqrt(deltaX * deltaX + deltaY * deltaY) / dashLength);
+ 				for(var i=0; i < numDashed; ++i){
+ 					this[i % 2===0 ? 'moveTo' : 'lineTo']
+ 								(startX + (deltaX / numDashed) * i, 
+ 									startY + (deltaY / numDashed) * i);
+ 				}
+ 				this.moveTo(x, y);
+ 			}
+
+ 			function draw(){
+ 				context.clearRect(0, 0, context.canvas.width, context.canvas.height);			
+ 				drawGrid(context, 'lightgray', 10, 10);
+ 				drawAxes();
+ 				context.save();
+ 				context.shadowColor = 'rgba(0,0,0,0.8)';
+ 				context.shadowOffsetX = 12;
+ 				context.shadowOffsetY = 12;
+ 				context.shadowBlur = 15;
+ 				drawTowArcs();
+
+ 				drawCutouts();
+ 				strokeCutoutShapes();
+
+ 				context.beginPath();
+ 				context.lineWidth = 3;
+ 				context.strokeStyle = 'blue';
+ 				context.moveTo(20, 20);
+ 				context.dashedLineTo(context.canvas.width - 20, 20);
+ 				context.dashedLineTo(context.canvas.width - 20, context.canvas.height - 20);
+ 				context.dashedLineTo(20, context.canvas.height - 20);
+ 				context.dashedLineTo(20, 20);
+ 				context.dashedLineTo(context.canvas.width - 20, context.canvas.height - 20);
+ 				context.stroke();
+
+
+ 				context.restore();
+ 				context.strokeStyle = strokeStyleSelect.value;
+ 			}
+
+ 			context.fillStyle = 'rgba(100,140,230,0.5)';
+ 			context.strokeStyle = context.fillStyle;
+ 			draw();
+		</script>
+	</body>
+</html>

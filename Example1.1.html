@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>A simple Canvas Example</title>
+		<style type="text/css">
+			body{
+				background-color: :#dddddd;
+			}
+			#canvas{
+				margin:10px;
+				padding: 10px;
+				background: #ffffff;
+				border: thin inset #aaaaaa;
+				width: 600px;
+				height: 300px;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas">
+			Canvas not supported
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d');
+
+			context.font = '38pt Arial';
+			context.fillStyle = 'cornflowerblue';
+			context.strokeStyle = 'blue';
+			context.fillText('Hello Canvas', canvas.width/2 - 150, 
+											canvas.height/2 +15);
+			context.strokeText('Hello Canvas', canvas.width/2 - 150,
+											canvas.height/2 +15);
+		</script>
+	</body>
+</html>

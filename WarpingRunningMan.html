@@ -1,0 +1,223 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Running Man</title>
+		<style type="text/css">
+			body{
+				background: #cdcdcd;
+			}
+			.controls{
+				position: absolute;
+				left: 150px;
+				top: 10px;
+				font: 12px Arial;
+			}
+			#canvas{
+				position: absolute;
+				left: 0px;
+				top: 20px;
+				margin: 20px;
+				border: thin inset rgba(100,150,230,0.8);
+				background: #efefef; 
+			}
+			#animateButton{
+				margin-left: 15px;
+				margin-bottom: 10px;
+			}
+		</style>
+	</head>
+	<body>
+		<input id='animateButton' type='button' value='Animate'/>
+		<canvas id='canvas' width='420' height='100'>
+			Canvas not supported
+		</canvas>
+		<div id='motionControls' class='controls'>
+			<div id='motionRadios'>
+				<label>
+					<input type='radio' name='motion' id='linearRadio' checked>Linear
+				</label>
+				<label>
+					<input type='radio' name='motion' id='easeInRadio' />Ease In
+				</label>
+				<label>
+					<input type='radio' name='motion' id='easeOutRadio' />Ease Out
+				</label>
+				<label>
+					<input type='radio' name='motion' id='easeInOutRadio'/>Ease In Out
+				</label>
+			</div>
+		</div>
+		<script type="text/javascript" src="requestAnimationFramePolyFill.js"></script>
+		<script type="text/javascript" src="Sprites.js"></script>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				
+				linearRadio = document.getElementById('linearRadio'),
+				easeInRadio = document.getElementById('easeInRadio'),
+				easeOutRadio = document.getElementById('easeOutRadio'),
+				easeInOutRadio = document.getElementById('easeInOutRadio'),
+
+				animateButton = document.getElementById('animateButton'),
+				spritesheet = new Image(),
+				runnerCells = [
+					{left: 0,   top: 0, width: 47, height: 64},
+					{left: 55,  top: 0, width: 44, height: 64},
+					{left: 107, top: 0, width: 39, height: 64},
+					{left: 152, top: 0, width: 46, height: 64},
+					{left: 208, top: 0, width: 49, height: 64},
+					{left: 265, top: 0, width: 46, height: 64},
+					{left: 320, top: 0, width: 42, height: 64},
+					{left: 380, top: 0, width: 35, height: 64},
+					{left: 425, top: 0, width: 35, height: 64}
+				],
+				interval,
+				lastAdvance = 0.0,
+				SPRITE_LEFT = canvas.width - runnerCells[0].width,
+				SPRITE_TOP = 10,
+ 
+				PAGEFLIP_INTERVAL = 100,
+				ANIMATION_DURATION = 3900,
+
+				animationTimer = new AnimationTimer(ANIMATION_DURATION, AnimationTimer.makeLinear(1)),
+
+				LEFT = 1.5,
+				RIGHT = canvas.width - runnerCells[0].width,
+				BASELINE = canvas.height - 9.5,
+				TICK_HEIGHT = 8.5,
+				WIDTH = RIGHT - LEFT,
+				runInPlace = {
+					execute: function(sprite, context, time){
+						var elapsed = animationTimer.getElapsedTime();
+						if (lastAdvance === 0) {
+							lastAdvance = elapsed;
+						}else if (lastAdvance !== 0 && elapsed - lastAdvance > PAGEFLIP_INTERVAL) {
+							sprite.painter.advance();
+							lastAdvance = elapsed;
+						};
+					}
+				},
+				moveRightToLeft = {
+					lastMove: 0,
+					reset: function(){
+						this.lastMove = 0;
+					},
+					execute: function(sprite, context, time){
+						var elapsed = animationTimer.getElapsedTime(),
+							advanceElapsed = elapsed - this.lastMove;
+						if (this.lastMove === 0) {
+							this.lastMove = elapsed;
+						}else{
+							sprite.left -= (advanceElapsed/1000) * sprite.velocityX;
+							console.log(sprite.left)
+							this.lastMove = elapsed;
+						}
+					}
+				},
+				sprite = new Sprite('runner', 
+									new SpriteSheetPainter(runnerCells, spritesheet), 
+									[moveRightToLeft, runInPlace]);
+
+				function endAnimation(){
+					animateButton.value = 'Animate';
+					animateButton.style.display = 'inline';
+					animationTimer.stop();
+					console.log(animationTimer.isRunning());
+					lastAdvance = 0;
+					sprite.painter.cellIndex = 0;
+					console.log(SPRITE_LEFT)
+					sprite.left = SPRITE_LEFT;
+					animationTimer.reset();
+					moveRightToLeft.reset();
+				}
+
+				function startAnimation(){
+					animationTimer.start();
+					animateButton.style.display = 'none';
+					window.requestNextAnimationFrame(animate);
+				}
+
+				function drawAxis(){
+					context.lineWidth = 0.5;
+					context.strokeStyle = 'cornflowerblue';
+					context.moveTo(LEFT, BASELINE);
+					context.lineTo(RIGHT, BASELINE);
+					context.stroke();
+					for(var i=0; i<= WIDTH; i+= WIDTH/20){
+						context.beginPath();
+						context.moveTo(LEFT + i, BASELINE - TICK_HEIGHT/2);
+						context.lineTo(LEFT + i, BASELINE + TICK_HEIGHT/2);
+						context.stroke();
+					}
+
+					for(var i=0; i<= WIDTH; i+= WIDTH/4){
+						context.beginPath();
+						context.moveTo(LEFT + i, BASELINE - TICK_HEIGHT);
+						context.lineTo(LEFT + i, BASELINE + TICK_HEIGHT);
+						context.stroke();
+					}
+					context.beginPath();
+					context.moveTo(RIGHT, BASELINE - TICK_HEIGHT);
+					context.lineTo(RIGHT, BASELINE + TICK_HEIGHT);
+					context.stroke();
+				}
+
+				function drawTimeLine(){
+					var realElapsed = animationTimer.getRealElapesdTime(),
+						realPercent = realElapsed / ANIMATION_DURATION;
+
+					context.lineWidth = 0.5;
+					context.strokeStyle = 'rgba(0,0,255,0.5)';
+					context.beginPath();
+					context.moveTo(WIDTH - realPercent * (WIDTH), 0);
+					context.lineTo(WIDTH - realPercent * (WIDTH), canvas.height);
+					context.stroke();
+				}
+
+				animateButton.onclick = function(e){
+					if (animateButton.value === 'Animate') startAnimation();
+					else 								   endAnimation();
+				}
+
+				linearRadio.onchange = function(e){
+					animationTimer.timeWarp = AnimationTimer.makeLinear(1);
+				}
+				easeInRadio.onchange = function(e){
+					animationTimer.timeWarp = AnimationTimer.makeEaseIn(1);
+				}
+				easeOutRadio.onchange = function(e){
+					animationTimer.timeWarp = AnimationTimer.makeEaseOut(1);
+				}
+				easeInOutRadio.onchange = function(e){
+					animationTimer.timeWarp = AnimationTimer.makeEaseInOut(1);
+				}
+
+				function animate(time){
+					if (animationTimer.isRunning()) {
+						elapsed = animationTimer.getElapsedTime();
+						context.clearRect(0, 0, canvas.width, canvas.height);
+						sprite.update(context, time);
+						sprite.paint(context);
+
+						drawTimeLine();
+						drawAxis();
+						if (animationTimer.isOver()) {
+							endAnimation();
+						};
+
+						window.requestNextAnimationFrame(animate);
+					};
+				}
+
+				spritesheet.src = 'images/running-sprite-sheet.png';
+				sprite.left = SPRITE_LEFT;
+				sprite.top = SPRITE_TOP;
+				sprite.velocityX = 100;
+
+				drawAxis();
+				spritesheet.onload = function(){
+					sprite.paint(context)
+				}
+		</script>
+	</body>
+</html>

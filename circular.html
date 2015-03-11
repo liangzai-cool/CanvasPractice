@@ -1,0 +1,66 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Circular TEXT</title>
+		<style type="text/css">
+			body{
+				background-color: gray;
+			}
+			#canvas{
+				margin: 10px;
+				background-color: #eee;
+				box-shadow: rgba(200,200,255,0.9) 5px 5px 10px;
+				border: thin solid #aaa;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="500" height="500">
+			can not support
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				TEXT_FILL_STYLE = 'rgba(100,130,240,0.5)',
+				TEXT_STROKE_STYLE = 'rgba(200,0,0,0.7)',
+				TEXT_SIZE = 64,
+				circle = {x:canvas.width/2,
+						  y:canvas.height/2,
+						  radius:200
+						};
+
+			function drawCircularText(string, startAngle, endAngle){
+				var radius = circle.radius,
+					angleIncrement = (endAngle - startAngle)/(string.length - 1),
+					angle = parseFloat(startAngle),
+					index = 0,
+					character;
+				context.save();
+				context.fillStyle = TEXT_FILL_STYLE;
+				context.strokeStyle = TEXT_STROKE_STYLE;
+				context.font = TEXT_SIZE+'px Lucida Sans';
+				while(index < string.length){
+					character = string.charAt(index);
+					context.save();
+					context.beginPath();
+					context.translate(circle.x + Math.cos(angle) * radius,
+									  circle.y + Math.sin(angle) * radius);
+					context.rotate(angle + Math.PI /2);
+					context.fillText(character, 0, 0);
+					context.strokeText(character, 0, 0);
+					
+					angle += angleIncrement;
+					index++;
+					context.restore()
+				}
+				context.restore();
+
+				context.textAlign = 'center';
+				context.textBaseline = 'middle';
+				
+			}
+			drawCircularText("Clockwise around the circle", Math.PI/8, Math.PI * 2);
+		</script>
+	</body>
+
+</html>

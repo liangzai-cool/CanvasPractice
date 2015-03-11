@@ -1,0 +1,102 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>spritesheetinsepector</title>
+		<style type="text/css">
+			body{
+				background-color: #dddddd;
+			}
+			#canvas{
+				position: absolute;
+				left: 0;
+				top: 20px;
+				margin: 20px;
+				background: #fff;
+				border: 10px inset rgba(100,150,230,0.5);
+				cursor: pointer;
+			}
+
+			#readout{
+				margin-top: 10px;
+				margin-left: 15px;
+				color: blue;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="readout"></div>
+		<canvas id="canvas" width="500" height="250">
+			canvas must be supported!
+		</canvas>
+		<script type="text/javascript">
+			var canvas = document.getElementById("canvas"),
+				context = canvas.getContext("2d"),
+				readout = document.getElementById("readout"),
+				spriteSheet = new Image();
+
+			function windowToCanvas(canvas, x, y){
+				var bbox = canvas.getBoundingClientRect();
+				console.log(bbox)
+				return {x: x - bbox.left - (bbox.width - canvas.width)/2,
+						y: y - bbox.top - (bbox.height - canvas.height)/2}
+			}
+
+			function drawBackground(){
+				var VERTICLA_LINE_SPACING = 12,
+					i = context.canvas.height;
+
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				context.strokeStyle = 'lightgray';
+				context.lineWidth = 0.5;
+
+				while(i > VERTICLA_LINE_SPACING * 4){
+					context.beginPath();
+					context.moveTo(0, i);
+					context.lineTo(context.canvas.width, i);
+					context.stroke();
+					i -= VERTICLA_LINE_SPACING
+				}
+			}
+
+			function drawSptiteSheet(){
+				context.drawImage(spriteSheet, 0, 0);
+			}
+			function drawGuideLines(x, y){
+				context.strokeStyle = "rgba(0,0,230,0.8)";
+				context.lineWidth = 0.5;
+				drawVerticalLine(x);
+				draHerizontalLine(y);
+			}
+			function drawVerticalLine(x){
+				context.beginPath();
+				context.moveTo(x, 0);
+				context.lineTo(x, context.canvas.height);
+				context.stroke();
+			}
+			function draHerizontalLine(y){
+				context.beginPath();
+				context.moveTo(0, y);
+				context.lineTo(context.canvas.width, y);
+				context.stroke();
+			}
+			function updateReadout(x, y){
+				readout.innerText = '('+ x.toFixed(0) +', '+ y.toFixed() +')';
+			}
+
+			canvas.onmousemove = function(e){
+				var loc = windowToCanvas(canvas, e.clientX, e.clientY);
+
+				drawBackground()
+				drawSptiteSheet();
+				drawGuideLines(loc.x, loc.y);
+				updateReadout(loc.x, loc.y);
+			}
+
+			spriteSheet.src = "images/run.jpg";
+			spriteSheet.onload = function(e){
+				drawSptiteSheet()
+			}
+			drawBackground()
+		</script>
+	</body>
+</html>

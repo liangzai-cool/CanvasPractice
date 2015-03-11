@@ -1,0 +1,368 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>bézier curves</title>
+		<style type="text/css">
+			body{
+				background-color: gray;
+			}
+			.floatingControls{
+				position: absolute;;
+				left: 150px;
+				top: 100px;
+				width: 300px;
+				padding: 20px;
+				border: thin solid rgba(0,0,0,0.3);
+				background: rgba(0,0,200,0.1);
+				color: blue;
+				font: 14px Arial;
+				box-shadow: rgba(0,0,0,0.2) 6px 6px 8px;
+				display: none; 
+			}
+			.floatingControls p{
+				margin-top: 0px;
+				margin-bottom: 20px;
+			}
+			#controls{
+				position: absolute;
+				left: 25px;
+				top: 25px;
+			}
+			#canvas{
+				margin: 10px;
+				background-color: white;
+				cursor: pointer;
+				box-shadow: 4px 4px 8px rgba(0,0,0,0.5);
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas" width="500" height="500">
+			your browser can not support
+		</canvas>
+		<div id="controls">
+			Stroke color:
+			<select id='strokeStyleSelect'>
+				<option value='red' selected>red</option>
+				<option value='green'>green</option>
+				<option value='blue'>blue</option>
+				<option value='orange'>orange</option>
+				<option value='cornflowerblue'>cornflowerblue</option>
+				<option value='goldenrod'>goldenrod</option>
+				<option value='navy'>navy</option>
+				<option value='purple'>purple</option>
+			</select>
+			Guidewires:
+			<input id='guidewireCheckbox' type="checkbox" checked>
+			<input id="earaseAllButton" type="button" value="Erase All">
+		</div>
+		<div id="instructions" class="floatingControls">
+			<p>Drag the curve end- and control points to change the shape of the curve</p>
+			<p>When you are done dragging end- and control points, click outside of the points to finalize the curve</p>
+			<input id="instructionsOkayButton" type='button' value='Okay' autofocus>
+			<input id="instructionsNoMoreButton" type='button' value='Do not show these instructions again'> 
+		</div>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				earaseAllButton = document.getElementById('earaseAllButton'),
+				strokeStyleSelect = document.getElementById('strokeStyleSelect'),
+				guidewireCheckbox = document.getElementById('guidewireCheckbox'),
+				instructions = document.getElementById('instructions'),
+				instructionsOkayButton = document.getElementById('instructionsOkayButton'),
+				instructionsNoMoreButton = document.getElementById('instructionsNoMoreButton'),
+				showInstructions = true,
+				//axis
+				AXIS_MARGIN = 40,
+				AXIS_ORIGIN = {x:AXIS_MARGIN, y:canvas.height - AXIS_MARGIN},
+				AXIS_TOP = AXIS_MARGIN,
+				AXIS_RIGHT = canvas.width - AXIS_MARGIN,
+				HORIZONTAL_TICK_SPACING = 10,
+				VERTICAL_TICK_SPACING = 10,
+				AXIS_WIDTH = AXIS_RIGHT - AXIS_ORIGIN.x,
+				AXIS_HEIGHT = AXIS_ORIGIN.y - AXIS_TOP,
+				NUM_VERTICAL_TICKS = AXIS_HEIGHT / VERTICAL_TICK_SPACING,
+				NUM_HORIZONTAL_TICKS = AXIS_WIDTH / HORIZONTAL_TICK_SPACING,
+				TICK_WIDTH = 10,
+				TICKS_LINEWIDTH = 0.5,
+				TICKS_COLOR = 'navy',
+				AXIS_LINEWIDTH = 0.5,
+				AXIS_COLOR = 'blue',
+
+				CONTROL_POINT_RADIUS = 5,
+				CONTROL_POINT_STROKE_STYLE = 'blue',
+				CONTROL_POINT_FILL_STYLE = 'rgba(255,255,0,0.5)',
+
+				END_POINT_STROKE_STYLE = 'navy',
+				END_POINT_FILL_STYLE = 'rgba(0,255,0,0.5)',
+
+				endPoints = [{}, {}],
+				controlPoints = [{}, {}],
+				drawingSurface,
+				mousedown = {},
+				rubberBand = {},
+				dragging = false,
+				draggingPoint = false,
+				editing = false,
+				guidewires = guidewireCheckbox.checked;
+
+			function drawGrid(color, stepx, stepy){
+				context.save()
+			   	context.shadowColor = undefined;
+			   	context.shadowOffsetX = 0;
+			   	context.shadowOffsetY = 0;
+			   	context.strokeStyle = color;
+			   	context.fillStyle = '#ffffff';
+			   	context.lineWidth = 0.5;
+			   	context.fillRect(0, 0, context.canvas.width,
+			                          context.canvas.height);
+			   	for (var i = stepx + 0.5; i < context.canvas.width; i += stepx) {
+			     	context.beginPath();
+			     	context.moveTo(i, 0);
+			     	context.lineTo(i, context.canvas.height);
+			    	context.stroke();
+				}
+				for (var i = stepy + 0.5;
+		            i < context.canvas.height; i += stepy) {
+		     		context.beginPath();
+		     		context.moveTo(0, i);
+		     		context.lineTo(context.canvas.width, i);
+		     		context.stroke();
+				}
+		   		context.restore();
+			}
+
+			function windowToCanvas(x, y){
+				var bbox = canvas.getBoundingClientRect();
+				return {x: x - bbox.left - (bbox.width - canvas.width)/2,
+						y: y - bbox.top - (bbox.height - canvas.height)/2}
+			}
+
+			function saveDrawingSurface(){
+				drawingSurface = context.getImageData(0, 0, canvas.width, canvas.height);
+			}
+
+			function restoreDrawingSurface(){
+				context.putImageData(drawingSurface, 0, 0);
+			}
+
+			function updateRubberbandRectangle(loc){
+				rubberBand.width = Math.abs(loc.x - mousedown.x);
+				rubberBand.height = Math.abs(loc.y - mousedown.y);
+
+				rubberBand.left = (loc.x > mousedown.x) ? mousedown.x: loc.x;
+				rubberBand.top = (loc.y > mousedown.y) ? mousedown.y: loc.y;	
+			}
+
+			function drawBezierCurve(){
+				context.strokeStyle = 'blue';
+				context.beginPath();
+				context.moveTo(endPoints[0].x, endPoints[0].y);
+				context.bezierCurveTo(controlPoints[0].x, controlPoints[0].y,
+							controlPoints[1].x, controlPoints[1].y,
+							endPoints[1].x, endPoints[1].y);
+				context.stroke();
+			}
+
+			function updateEndAndControlPoints(){
+				endPoints[0].x = rubberBand.left;
+				endPoints[0].y = rubberBand.top;
+
+				endPoints[1].x = rubberBand.left + rubberBand.width;
+				endPoints[1].y = rubberBand.top + rubberBand.height;
+				
+				controlPoints[0].x = rubberBand.left;
+				controlPoints[0].y = rubberBand.top + rubberBand.height;
+				
+				controlPoints[1].x = rubberBand.left + rubberBand.width;
+				controlPoints[1].y = rubberBand.top;
+ 			}
+
+ 			function drawRubberbandShape(){
+ 				updateEndAndControlPoints();
+ 				drawBezierCurve();
+ 			}
+
+ 			function updateRubberband(loc){
+ 				updateRubberbandRectangle(loc);
+ 				drawRubberbandShape();
+ 			}
+
+ 			function drawGuidewires(loc){
+				context.save();
+				context.strokeStyle = 'lightgray';
+				context.lineWidth = 0.5;
+				drawVerticalGuidewire(loc);
+				drawHorizontalGuidewire(loc);
+				context.restore();
+			}
+
+			function drawVerticalGuidewire(loc){
+				context.beginPath();
+				context.moveTo(loc.x, 0);
+				context.lineTo(loc.x, context.canvas.height);
+				context.stroke();
+			}
+
+			function drawHorizontalGuidewire(loc){
+				context.beginPath();
+				context.moveTo(0, loc.y);
+				context.lineTo(context.canvas.width, loc.y);
+				context.stroke();
+			}
+
+			function drawEndPoint(index){
+				context.beginPath();
+				context.arc(endPoints[index].x, endPoints[index].y, CONTROL_POINT_RADIUS,
+					0, Math.PI*2, false);
+				context.stroke();
+				context.fill();
+			}
+
+			function drawEndPoints(){
+				context.save();
+				context.strokeStyle = END_POINT_STROKE_STYLE;
+				context.fillStyle = END_POINT_FILL_STYLE;
+				drawEndPoint(0);
+				drawEndPoint(1);
+				context.stroke();
+				context.fill();
+				context.restore();
+			}
+
+			function drawControlPoint(index){
+				context.beginPath();
+				context.arc(controlPoints[index].x, controlPoints[index].y, CONTROL_POINT_RADIUS,
+					0, Math.PI*2, false);
+				context.stroke();
+				context.fill();
+			}
+
+			function drawControlPoints(){
+				context.save();
+				context.strokeStyle = CONTROL_POINT_STROKE_STYLE;
+				context.fillStyle = CONTROL_POINT_FILL_STYLE;
+				drawControlPoint(0);
+				drawControlPoint(1);
+				context.stroke();
+				context.fill();
+				context.restore();
+			}
+
+			function drawControlAndEndPoints(){
+				drawControlPoints();
+				drawEndPoints();
+			}
+
+			function cursorInEndPoint(loc){
+				var pt;
+				endPoints.forEach(function(point){
+					context.beginPath();
+					context.arc(point.x, point.y, CONTROL_POINT_RADIUS, 0, Math.PI*2, false);
+					if(context.isPointInPath(loc.x, loc.y)){
+						pt = point;
+					}
+				})
+				return pt;
+			}
+
+			function cursorInControlPoint(loc){
+				var pt;
+				controlPoints.forEach(function(point){
+					context.beginPath();
+					context.arc(point.x, point.y, CONTROL_POINT_RADIUS, 0, Math.PI*2, false);
+					if(context.isPointInPath(loc.x, loc.y)){
+						pt = point;
+					}
+				})
+				return pt;
+			}
+
+			function updateDragginPoint(loc){
+				draggingPoint.x = loc.x;
+				draggingPoint.y = loc.y;
+			}
+
+			canvas.onmousedown = function(e){
+				e.preventDefault();
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				if (!editing) {
+					saveDrawingSurface();
+					mousedown.x = loc.x;
+					mousedown.y = loc.y;
+					updateRubberbandRectangle(loc);
+					dragging = true;
+				}else{
+					draggingPoint = cursorInControlPoint(loc);
+					if (!draggingPoint) {
+						draggingPoint = cursorInEndPoint(loc);
+					};
+				}
+			}
+			canvas.onmousemove = function(e){
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				
+				if (dragging || draggingPoint) {
+					e.preventDefault();
+					restoreDrawingSurface();
+					if (guidewires) {
+						drawGuidewires(loc.x, loc.y);
+					};	
+				}
+				if (dragging) {
+					updateRubberband(loc);
+					drawControlAndEndPoints();
+				}else if(draggingPoint){
+					updateDragginPoint(loc);
+					drawControlAndEndPoints();
+					drawBezierCurve();
+				}
+			}
+			canvas.onmouseup = function(e){
+				restoreDrawingSurface();
+				var loc = windowToCanvas(e.clientX, e.clientY);
+				if (!editing) {
+					updateRubberband(loc);
+					drawControlAndEndPoints();
+					dragging = false;
+					editing = true;
+					if (showInstructions) {
+						instructions.style.display = 'block';
+					};
+				}else{
+					if (draggingPoint) drawControlAndEndPoints();
+					else editing = false;
+
+					drawBezierCurve();
+					draggingPoint = undefined;
+				}
+			}
+
+			earaseAllButton.onclick = function(e){
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				drawGrid('lightgray', 10, 10);
+				saveDrawingSurface();
+				editing = false;
+				dragging = false;
+				draggingPoint = undefined;
+			}
+			strokeStyleSelect.onchange = function(e){
+				context.strokeStyle = strokeStyleSelect.value;
+			}
+
+			instructionsOkayButton.onclick = function(e){
+				instructions.style.display = 'none';
+			}
+
+			instructionsNoMoreButton.onclick = function(e){
+				instructions.style.display = 'none';
+				showInstructions = false;
+			}
+
+			context.strokeStyle = strokeStyleSelect.value;
+			drawGrid('lightgray', 10, 10);
+
+			
+		</script>
+	</body>
+</html>
