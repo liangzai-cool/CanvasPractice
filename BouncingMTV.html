@@ -1,0 +1,227 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>RectCollision</title>
+		<style type="text/css">
+			#canvas{
+				background-color: lightblue;
+				box-shadow: 5px 5px 10px rgba(0,0,0,0.8);
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id='canvas' width='800' height='600'>
+			Canvas not supported
+		</canvas>
+		<script type="text/javascript" src='Shapemodal.js'></script>
+		<script type="text/javascript" src='requestAnimationFramePolyFill.js'></script>
+		<script type="text/javascript">
+			var canvas = document.getElementById('canvas'),
+				context = canvas.getContext('2d'),
+				shapes = [],
+				
+				polygonPoints = [
+					[new Point(250,150), new Point(250,250), new Point(350,250)],
+					//[new Point(100,100), new Point(100,150), new Point(150,150), new Point(150,100)],
+					[new Point(400,100), new Point(380,150), new Point(500,150), new Point(520,100)]
+				],
+				polygonStrokeStyle = ['blue', 'yellow', 'red'],
+				polygonFillStyle = ['rgba(255,255,0,0.7)',
+									'rgba(100,140,230,0.6)',
+									'rgba(255,255,255,0.8'],
+				shapeMoving = undefined,
+				c1 = new Circle(150, 275, 20),
+				c2 = new Circle(350, 350, 30),
+				lastTime = undefined,
+				velocity = {x: 200, y:230},
+				lastVelocity = {x: 200, y:230},
+				STICK_DELAY = 500,
+				stuck = false,
+				showInstructions = true;
+
+
+				function windowToCanvas(x, y){
+					var bbox = canvas.getBoundingClientRect();
+					return {x: x - bbox.left * (canvas.width / bbox.width),
+							y: y - bbox.top * (canvas.height) / bbox.height}
+				}
+
+				function drawShapes(){
+					shapes.forEach(function (shape){
+						shape.stroke(context);
+						shape.fill(context);
+					})
+				}
+
+				function detectCollisions(){
+					if (shapeMoving) {
+						handleShapeCollisions();
+						handleEdgeCollisions();
+					};
+				}
+
+				function handleShapeCollisions(){
+					var mtv;
+					shapes.forEach(function (shape){
+						if (shape !== shapeMoving) {
+							mtv = shapeMoving.collidesWith(shape);
+							if (collisionDetected(mtv)) {
+								bounce(mtv, shapeMoving, shape);
+							};
+						};
+					})
+				}
+
+				function handleEdgeCollisions(){
+					var bbox = shapeMoving.boundingBox();
+					//console.log(bbox)
+					if (bbox.left + bbox.width > canvas.width || bbox.left < 0) {
+						velocity.x = -velocity.x;
+					}
+					if (bbox.top + bbox.height > canvas.height || bbox.top < 0) {
+						velocity.y = -velocity.y;
+					};
+				}
+
+				function collisionDetected(mtv){
+					return mtv.axis != undefined || mtv.overlap !== 0;
+				}
+
+				function separate(mtv){
+					var dx, dy, velocityMagnitude, point;
+
+					if (mtv.axis === undefined) {
+						velocityMagnitude = Math.sqrt(Math.pow(velocity.x, 2) + Math.pow(velocity.y, 2));
+						mtv.axis = new Vector(velocity.x / velocityMagnitude, velocity.y / velocityMagnitude)
+					};
+
+					dy = mtv.axis.y * mtv.overlap;
+					dx = mtv.axis.x * mtv.overlap;
+
+					if ((dx < 0 && velocity.x < 0) || (dx > 0 && velocity.x > 0)){dx = -dx};
+					if ((dy < 0 && velocity.y < 0) || (dy > 0 && velocity.y > 0)){dy = -dy};
+					shapeMoving.move(dx, dy);
+				}
+
+				function checkMTVAxisDirection(mtv, collider, collidee){
+					var centroid1, centroid2, centroidVector, centroidUnitVector;
+
+					if (mtv.axis === undefined) return;
+
+					centroid1 = new Vector(collider.centroid());
+					centroid2 = new Vector(collider.centroid());
+					centroidVector = centroid2.subtract(centroid1);
+					centroidUnitVector = (new Vector(centroidVector)).normalize();
+
+					if (centroidUnitVector.dotProduct(mtv.axis > 0)) {
+						mtv.axis.x = -mtv.axis.x;
+						mtv.axis.y = -mtv.axis.y;
+					};
+					
+				}
+
+				function bounce(mtv, collider, collidee){
+					var dotProductRadio, vdot1, ldot1, point,
+						velocityVector = new Vector(new Point(velocity.x, velocity.y));
+						velocityUnitVector = velocityVector.normalize(),
+						velocityVectorMagnitude = velocityVector.getMagnitude(),
+						perpendicular = undefined;
+
+					if (shapeMoving) {
+						checkMTVAxisDirection(mtv, collider, collidee);
+						point = new Point();
+
+						if (mtv.axis !== undefined) {
+							perpendicular = mtv.axis.perpendicular();
+						}else{
+							perpendicular = new Vector(new Point(-velocityUnitVector.y, velocityUnitVector.x))
+						}
+						vdot1 = velocityUnitVector.dotProduct(perpendicular);
+						ldot1 = perpendicular.dotProduct(perpendicular);
+						dotProductRadio = vdot1 / ldot1;
+
+						point.x = 2 * dotProductRadio * perpendicular.x - velocityUnitVector.x;
+						point.y = 2 * dotProductRadio * perpendicular.y - velocityUnitVector.y;
+
+						separate(mtv);
+						velocity.x = point.x * velocityVectorMagnitude;
+						velocity.y = point.y * velocityVectorMagnitude;
+					};
+				}
+
+				canvas.onmousedown = function(e){
+					var location = windowToCanvas(e.clientX, e.clientY);
+					if (showInstructions) 
+						showInstructions = false;
+					velocity.x = lastVelocity.x;
+					velocity.y = lastVelocity.y;
+
+					shapeMoving = undefined;
+					lastTime = 0;
+					stuck = false;
+					shapes.forEach(function (shape){
+						if (shape.isPointInPath(context, location.x, location.y)) {
+							shapeMoving = shape;
+						};
+					})
+					//animate()
+				}
+
+				function animate(time){
+					//console.log('animate')
+					var elapsedTime, deltaX;
+					if (lastTime === 0) {
+						if (time !== undefined) 
+							lastTime = time;
+
+						window.requestNextAnimationFrame(animate);
+						return;
+					};
+					context.clearRect(0, 0, canvas.width, canvas.height);
+					if (shapeMoving !== undefined) {
+
+						elapsedTime = parseFloat(time - lastTime) / 1000;
+						shapeMoving.move(velocity.x * elapsedTime, velocity.y * elapsedTime);
+						//console.log(lastTime)
+					}
+					detectCollisions();
+					drawShapes();
+					lastTime = time;
+					if (showInstructions) {
+						context.fillStyle = 'cornflowerblue';
+						context.font = '24px Arial';
+						context.fillText('Click on a shape to animate it', 20, 40);
+					};
+					//test
+					if (!stuck) {
+						window.requestNextAnimationFrame(animate);
+					};
+					
+				}
+
+				for(var i=0; i< polygonPoints.length; ++i){
+					var polygon = new Polygon(),
+						points = polygonPoints[i];
+
+					polygon.strokeStyle = polygonStrokeStyle[i];
+					polygon.fillStyle = polygonFillStyle[i];
+
+					points.forEach(function (point){
+						polygon.addPoint(point.x, point.y);
+					})
+					shapes.push(polygon);
+				}
+				c1.fillStyle = "rgba(200, 50, 50, 0.5)";
+				//shapes.push(c1);
+				//shapes.push(c2);
+
+				context.shadowColor = 'rgba(100,140,255,0.5)';
+				context.shadowBlue = 4;
+				context.shadowOffsetX = 2;
+				context.shadowOffsetY = 2;
+				context.font = '38px Arial';
+
+				window.requestNextAnimationFrame(animate)
+		</script>
+	</body>
+</html>
